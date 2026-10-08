@@ -17,9 +17,7 @@ class APIClient:
 
         return headers
 
-    # -------------------------
-    # AUTH
-    # -------------------------
+    
 
     def login(self, email, password):
         response = requests.post(
@@ -48,9 +46,7 @@ class APIClient:
         response.raise_for_status()
         return response.json()
 
-    # -------------------------
-    # TASKS
-    # -------------------------
+    
 
     def get_tasks(self):
         response = requests.get(
@@ -94,10 +90,7 @@ class APIClient:
         response.raise_for_status()
         return response.json()
 
-    # -------------------------
-    # AI TASK
-    # -------------------------
-
+    
     def create_ai_task(self, text):
         response = requests.post(
             f"{API_BASE_URL}/ai/create-task",
@@ -111,10 +104,7 @@ class APIClient:
         response.raise_for_status()
         return response.json()
 
-    # -------------------------
-    # SCHEDULE
-    # -------------------------
-
+    
     def generate_schedule(
         self,
         start_date,
@@ -146,6 +136,55 @@ class APIClient:
                 "number_of_days": number_of_days,
             },
             timeout=90,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    
+
+    def get_google_calendar_status(self):
+        response = requests.get(
+            f"{API_BASE_URL}/calendar/status",
+            headers=self._headers(),
+            timeout=30,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    def connect_google_calendar(self):
+        response = requests.post(
+            f"{API_BASE_URL}/calendar/connect",
+            headers=self._headers(),
+            timeout=90,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    def get_google_calendar_events(self, days=7):
+        response = requests.get(
+            f"{API_BASE_URL}/calendar/events",
+            headers=self._headers(),
+            params={
+                "days": days,
+            },
+            timeout=90,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+
+    def chat_with_agent(self, message):
+        response = requests.post(
+            f"{API_BASE_URL}/agent/chat",
+            headers=self._headers(),
+            params={
+                "message": message,
+            },
+            timeout=120,
         )
 
         response.raise_for_status()
