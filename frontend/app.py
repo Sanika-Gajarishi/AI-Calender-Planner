@@ -4,6 +4,7 @@ from api_client import APIClient
 from components.calendar_view import render_calendar_view
 from components.task_form import render_task_form
 from components.task_list import render_task_list
+from components.agent_chat import render_agent_chat
 
 
 st.set_page_config(
@@ -18,6 +19,7 @@ PAGES = (
     "Create Task with AI",
     "My Tasks",
     "Smart Schedule",
+    "🤖 AI Calendar Agent",
 )
 
 
@@ -40,9 +42,20 @@ elif st.session_state.page not in PAGES:
 if not st.session_state.token:
     st.title("📅 AI Calendar Planner")
     st.caption("Your intelligent task scheduling assistant")
-    st.subheader("Login")
+    auth_mode = st.radio(
+        "Account",
+        ("Login", "Register"),
+        horizontal=True,
+    )
+    st.subheader(auth_mode)
 
-    with st.form("login_form"):
+    with st.form(f"{auth_mode.lower()}_form"):
+        name = None
+        if auth_mode == "Register":
+            name = st.text_input(
+                "Name",
+                placeholder="Enter your name",
+            )
         email = st.text_input(
             "Email",
             placeholder="Enter your email",
@@ -53,23 +66,39 @@ if not st.session_state.token:
             placeholder="Enter your password",
         )
         submitted = st.form_submit_button(
-            "Login",
+            auth_mode,
             type="primary",
             use_container_width=True,
         )
 
     if submitted:
         if not email.strip() or not password:
-            st.warning("Please enter your email and password.")
+            st.warning(
+                "Please enter your email and password."
+            )
         else:
             try:
-                result = APIClient().login(email.strip(), password)
-                st.session_state.token = result["access_token"]
-                st.session_state.schedule = None
-                st.success("Login successful.")
-                st.rerun()
+                if auth_mode == "Register":
+                    APIClient().register(
+                        name.strip() or None,
+                        email.strip(),
+                        password,
+                    )
+                    st.success(
+                        "Registration successful. Please log in."
+                    )
+                else:
+                    result = APIClient().login(
+                        email.strip(),
+                        password,
+                    )
+                    st.session_state.token = result["access_token"]
+                    st.session_state.schedule = None
+                    st.success("Login successful.")
+                    st.rerun()
             except Exception as error:
-                st.error(f"Login failed: {error}")
+                action = auth_mode.lower()
+                st.error(f"{action.capitalize()} failed: {error}")
 
 else:
     client = APIClient(token=st.session_state.token)
@@ -191,6 +220,55 @@ else:
                     "using AI."
                 )
 
+        st.divider()
+        st.subheader("📅 Google Calendar")
+
+        try:
+            calendar_status = client.get_google_calendar_status()
+
+            if calendar_status.get("connected"):
+                st.success("Google Calendar is connected.")
+
+                if st.button(
+                    "🔄 Check Calendar Events",
+                    use_container_width=True,
+                ):
+                    try:
+                        result = client.get_google_calendar_events()
+                        st.session_state.google_events = result.get(
+                            "events",
+                            [],
+                        )
+                        st.success(
+                            f"Found {result.get('count', 0)} "
+                            "calendar events."
+                        )
+                    except Exception as error:
+                        st.error(
+                            f"Unable to fetch calendar events: {error}"
+                        )
+            else:
+                st.info("Google Calendar is not connected.")
+
+                if st.button(
+                    "🔗 Connect Google Calendar",
+                    use_container_width=True,
+                ):
+                    try:
+                        result = client.connect_google_calendar()
+
+                        if result.get("connected"):
+                            st.success(
+                                "Google Calendar connected successfully!"
+                            )
+                            st.rerun()
+                    except Exception as error:
+                        st.error(f"Connection failed: {error}")
+        except Exception as error:
+            st.error(
+                f"Unable to check Google Calendar status: {error}"
+            )
+
     elif page == "Create Task with AI":
         render_task_form(client)
 
@@ -199,3 +277,6 @@ else:
 
     elif page == "Smart Schedule":
         render_calendar_view(client)
+
+    elif page == "🤖 AI Calendar Agent":
+        render_agent_chat(client)
