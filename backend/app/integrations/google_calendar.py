@@ -123,3 +123,44 @@ class GoogleCalendarService:
             calendarId="primary",
             eventId=event_id,
         ).execute()
+
+    def update_event(
+        self,
+        event_id: str,
+        title: str,
+        start_time: datetime,
+        end_time: datetime,
+        description: str | None = None,
+    ):
+        event = {
+            "summary": title,
+            "description": (
+                description
+                or "Created by AI Calendar Planner"
+            ),
+            "extendedProperties": {
+                "private": {
+                    "ai_calendar_planner": "scheduled_task",
+                },
+            },
+            "start": {
+                "dateTime": start_time.isoformat(),
+                "timeZone": "Asia/Kolkata",
+            },
+            "end": {
+                "dateTime": end_time.isoformat(),
+                "timeZone": "Asia/Kolkata",
+            },
+        }
+
+        updated_event = (
+            self.service.events()
+            .update(
+                calendarId="primary",
+                eventId=event_id,
+                body=event,
+            )
+            .execute()
+        )
+
+        return updated_event
