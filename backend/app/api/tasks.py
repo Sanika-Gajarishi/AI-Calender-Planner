@@ -6,7 +6,9 @@ from app.database.connection import get_db
 from app.models.task import Task
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
-
+from app.models.scheduled_block import ScheduledBlock
+from app.integrations.google_auth import get_google_credentials
+from app.integrations.google_calendar import GoogleCalendarService
 
 router = APIRouter(
     prefix="/tasks",
@@ -131,9 +133,38 @@ def delete_task(
             detail="Task not found",
         )
 
+    scheduled_blocks = (
+        db.query(ScheduledBlock)
+        .filter(ScheduledBlock.task_id == task.id)
+        .all()
+    )
+
+    credentials = get_google_credentials()
+
+    if credentials:
+        google_calendar = GoogleCalendarService(
+            credentials=credentials
+        )
+
+        for block in scheduled_blocks:
+            if block.google_event_id:
+                try:
+                    google_calendar.delete_event(
+                        block.google_event_id
+                    )
+                except Exception as error:
+                    # The event may already have been deleted in Google Calendar.
+                    print(
+                        f"Could not delete Google event "
+                        f"{block.google_event_id}: {error}"
+                    )
+
     db.delete(task)
     db.commit()
 
     return {
-        "message": "Task deleted successfully"
+        "message": (
+            "Task and associated Google Calendar events "
+            "deleted successfully"
+        )
     }
