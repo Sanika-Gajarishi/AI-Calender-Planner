@@ -41,7 +41,9 @@ USER TIMEZONE:
 {timezone}
 
 Use the current date and timezone above when
-interpreting relative dates such as:
+interpreting relative dates and times.
+
+Examples of relative dates:
 
 - today
 - tomorrow
@@ -66,28 +68,78 @@ description:
 A concise description of the task.
 
 priority:
-Must be one of:
+Must be exactly one of:
 low
 medium
 high
+
+If priority is not explicitly mentioned,
+use "medium".
 
 estimated_minutes:
 Estimated total time required for the task.
 Return an integer number of minutes.
 
-deadline:
-Return an ISO-8601 datetime if a deadline
-is explicitly or relatively provided.
+Examples:
+2 hours = 120
+1.5 hours = 90
+30 minutes = 30
 
-If no deadline is provided, return null.
+deadline:
+The date and time by which the task should
+be completed.
+
+Return an ISO-8601 datetime when the user
+explicitly or relatively provides a deadline.
+
+Examples:
+
+"finish this by October 10"
+→ deadline should be October 10.
+
+"complete this tomorrow"
+→ deadline should be tomorrow.
+
+"I need this done by Friday at 6 PM"
+→ deadline should be Friday at 18:00.
+
+"submit it in 3 days"
+→ deadline should be current date + 3 days.
+
+"finish this by tomorrow evening"
+→ deadline should be tomorrow evening.
+
+IMPORTANT:
+Only set a deadline when the user's request
+indicates that the task itself must be completed
+by that date or time.
+
+Do NOT automatically treat an unrelated event date
+as the task deadline.
+
+For example:
+
+"I have an interview on October 12 and need
+to prepare for it."
+
+The interview date is context for the task.
+Treat October 12 as the deadline for preparation
+only when the wording indicates that preparation
+should be completed before the interview.
+
+If the user does not provide enough information
+to determine a deadline, return null.
 
 preferred_time:
-Must be one of:
+Must be exactly one of:
 morning
 afternoon
 evening
 night
 or null.
+
+Only set preferred_time when the user indicates
+when they prefer to work on the task.
 
 category:
 Choose a useful category such as:
@@ -99,24 +151,26 @@ personal
 health
 other
 
-Choose the category based on the task's primary goal,
-not the activity used to complete it. For example, preparing
-for an interview is category "interview", even when the user
-describes studying or practicing as the preparation activity.
+Choose the category based on the task's
+primary goal, not the activity used to complete it.
+
+For example:
+"Practice Python for my interview"
+→ category = "interview"
+
+"Build my AI Calendar Planner"
+→ category = "project"
 
 Rules:
 
 1. Do not invent information.
 
-2. Use the provided current date when
+2. Use the provided current date and time when
 interpreting relative dates.
 
-3. Convert hours to minutes.
+3. Respect the user's timezone.
 
-Example:
-2 hours = 120.
-
-4. Convert minutes directly.
+4. Convert hours to minutes.
 
 5. Keep the title concise.
 
@@ -126,7 +180,18 @@ use "medium".
 7. If a preferred time is not mentioned,
 return null.
 
-8. Return ONLY JSON.
+8. If a deadline is not provided or cannot be
+determined reliably, return null.
+
+9. Never use a date from unrelated context as
+the deadline unless the wording indicates that
+the task should be completed by that date.
+
+10. Return ONLY valid JSON.
+
+11. Do not include markdown.
+
+12. Do not include explanations outside the JSON.
 """
 
         response = self.gemini.generate_json(prompt)
