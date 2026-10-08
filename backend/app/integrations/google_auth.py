@@ -37,9 +37,7 @@ def get_google_credentials():
 
     credentials = None
 
-    # -------------------------------------------------
-    # 1. Load existing token
-    # -------------------------------------------------
+    
 
     if TOKEN_FILE.exists():
 
@@ -50,17 +48,13 @@ def get_google_credentials():
             )
         )
 
-    # -------------------------------------------------
-    # 2. Existing token is valid
-    # -------------------------------------------------
+    
 
     if credentials and credentials.valid:
 
         return credentials
 
-    # -------------------------------------------------
-    # 3. Existing token expired
-    # -------------------------------------------------
+   
 
     if (
         credentials
@@ -91,9 +85,7 @@ def get_google_credentials():
 
             credentials = None
 
-    # -------------------------------------------------
-    # 4. No valid credentials
-    # -------------------------------------------------
+
 
     if credentials is None:
 
@@ -120,10 +112,7 @@ def get_google_credentials():
             "Google Calendar authorization successful."
         )
 
-    # -------------------------------------------------
-    # 5. Save new token
-    # -------------------------------------------------
-
+    
     with open(
         TOKEN_FILE,
         "w",
