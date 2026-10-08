@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.api.agent import router as agent_router
 from app.api.calendar import router as calendar_router
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError
@@ -70,6 +71,7 @@ app.include_router(
     ai_task_router
 )
 app.include_router(calendar_router)
+app.include_router(agent_router)
 
 @app.get("/")
 def root():
