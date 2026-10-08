@@ -183,3 +183,38 @@ def render_calendar_view(client):
                 st.write(
                     f"**{priority.upper()}**"
                 )
+
+    if st.button(
+        "📅 Sync Schedule to Google Calendar",
+        type="primary",
+        use_container_width=True,
+    ):
+
+        with st.spinner(
+            "Syncing schedule to Google Calendar..."
+        ):
+
+            try:
+
+                result = client.sync_schedule_to_google_calendar(
+                    start_date.isoformat(),
+                    number_of_days,
+                )
+
+                st.success(
+                    result.get(
+                        "message",
+                        "Schedule synced successfully."
+                    )
+                )
+
+                st.info(
+                    f"Created: {result.get('events_created', 0)} "
+                    f"| Skipped: {result.get('events_skipped', 0)}"
+                )
+
+            except Exception as error:
+
+                st.error(
+                    f"Google Calendar sync failed: {error}"
+                )
