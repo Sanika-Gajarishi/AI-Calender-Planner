@@ -97,9 +97,7 @@ class ScheduleService:
         start_date: date,
         number_of_days: int = 7,
     ):
-        # --------------------------------------------------
-        # 1. Get user preferences
-        # --------------------------------------------------
+        
 
         preferences = (
             self.db.query(UserPreference)
@@ -118,9 +116,7 @@ class ScheduleService:
             preferences.timezone
         )
 
-        # --------------------------------------------------
-        # 2. Define schedule date range
-        # --------------------------------------------------
+        
 
         range_start = datetime.combine(
             start_date,
@@ -135,10 +131,7 @@ class ScheduleService:
             tzinfo=timezone,
         )
 
-        # --------------------------------------------------
-        # 3. Remove previously generated blocks
-        #    BEFORE calculating remaining task time
-        # --------------------------------------------------
+        
 
         existing_blocks = (
             self.db.query(ScheduledBlock)
@@ -168,9 +161,7 @@ class ScheduleService:
 
         self.db.flush()
 
-        # --------------------------------------------------
-        # 4. Get user's pending tasks
-        # --------------------------------------------------
+        
 
         tasks = (
             self.db.query(Task)
@@ -187,7 +178,8 @@ class ScheduleService:
         print("Total tasks:", len(tasks))
         for task in tasks:
             scheduling_task = task_to_scheduling_task(
-                task
+                task,
+                use_remaining=True,
             )
 
             print(
@@ -213,9 +205,7 @@ class ScheduleService:
             tasks_with_remaining_time,
         )
 
-        # --------------------------------------------------
-        # 5. Build daily availability
-        # --------------------------------------------------
+        
 
         days = []
 
@@ -264,9 +254,7 @@ class ScheduleService:
                 )
             )
 
-        # --------------------------------------------------
-        # 6. Generate schedule
-        # --------------------------------------------------
+        
 
         generated_schedule = generate_multi_day_schedule(
             tasks=tasks_with_remaining_time,
@@ -275,9 +263,7 @@ class ScheduleService:
             break_duration=preferences.break_duration,
         )
 
-        # --------------------------------------------------
-        # 7. Save generated schedule
-        # --------------------------------------------------
+        
 
         for scheduled_task in generated_schedule:
 
@@ -292,9 +278,7 @@ class ScheduleService:
 
         self.db.commit()
 
-        # --------------------------------------------------
-        # 8. Return generated schedule
-        # --------------------------------------------------
+        
 
         return generated_schedule
 
@@ -387,4 +371,174 @@ class ScheduleService:
         return {
             "created": created_count,
             "skipped": skipped_count,
+        }
+
+    def reschedule_task(
+        self,
+        user_id: int,
+        task_id: int,
+        new_start: datetime,
+        new_end: datetime,
+    ):
+        
+
+        task = (
+            self.db.query(Task)
+            .filter(
+                Task.id == task_id,
+                Task.user_id == user_id,
+            )
+            .first()
+        )
+
+        if task is None:
+            raise ValueError("Task not found.")
+
+        
+
+        block = (
+            self.db.query(ScheduledBlock)
+            .join(Task)
+            .filter(
+                ScheduledBlock.task_id == task_id,
+                Task.user_id == user_id,
+            )
+            .order_by(ScheduledBlock.start_time)
+            .first()
+        )
+
+        if block is None:
+            raise ValueError(
+                "No scheduled block found for this task."
+            )
+
+        
+
+        if new_end <= new_start:
+            raise ValueError(
+                "End time must be after start time."
+            )
+
+        duration_minutes = int(
+            (new_end - new_start).total_seconds() / 60
+        )
+
+        if duration_minutes <= 0:
+            raise ValueError(
+                "Duration must be greater than zero."
+            )
+
+        
+
+        calendar_events = self.calendar_service.google_calendar.get_events(
+            start_time=new_start,
+            end_time=new_end,
+        )
+
+        conflicts = []
+
+        for event in calendar_events:
+
+            event_id = event.get("id")
+
+            # Ignore the Google Calendar event belonging to
+            # the task that we are currently rescheduling.
+            if (
+                block.google_event_id
+                and event_id == block.google_event_id
+            ):
+                continue
+
+            event_start = event.get(
+                "start",
+                {},
+            ).get("dateTime")
+
+            event_end = event.get(
+                "end",
+                {},
+            ).get("dateTime")
+
+            if not event_start or not event_end:
+                continue
+
+            try:
+                existing_start = datetime.fromisoformat(
+                    event_start.replace("Z", "+00:00")
+                )
+
+                existing_end = datetime.fromisoformat(
+                    event_end.replace("Z", "+00:00")
+                )
+
+            except ValueError:
+                continue
+
+            # Standard interval overlap check.
+            if (
+                new_start < existing_end
+                and new_end > existing_start
+            ):
+                conflicts.append(
+                    {
+                        "title": event.get(
+                            "summary",
+                            "Untitled event",
+                        ),
+                        "start": existing_start.isoformat(),
+                        "end": existing_end.isoformat(),
+                    }
+                )
+
+        
+
+        if conflicts:
+
+            conflict_lines = []
+
+            for conflict in conflicts:
+                conflict_lines.append(
+                    f"- {conflict['title']}: "
+                    f"{conflict['start']} -> "
+                    f"{conflict['end']}"
+                )
+
+            raise ValueError(
+                "The new time conflicts with existing "
+                "Google Calendar events:\n"
+                + "\n".join(conflict_lines)
+            )
+
+        
+
+        if block.google_event_id:
+
+            self.calendar_service.google_calendar.update_event(
+                event_id=block.google_event_id,
+                title=task.title,
+                start_time=new_start,
+                end_time=new_end,
+                description=(
+                    "Created by AI Calendar Planner\n"
+                    f"Task ID: {task.id}"
+                ),
+            )
+
+        
+        block.start_time = new_start
+        block.end_time = new_end
+        block.duration_minutes = duration_minutes
+
+        self.db.commit()
+        self.db.refresh(block)
+
+
+        return {
+            "success": True,
+            "task_id": task.id,
+            "title": task.title,
+            "start": block.start_time.isoformat(),
+            "end": block.end_time.isoformat(),
+            "duration_minutes": block.duration_minutes,
+            "google_event_id": block.google_event_id,
         }
