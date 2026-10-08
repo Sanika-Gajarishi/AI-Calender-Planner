@@ -121,5 +121,6 @@ def get_google_credentials():
         token.write(
             credentials.to_json()
         )
+        
 
     return credentials
