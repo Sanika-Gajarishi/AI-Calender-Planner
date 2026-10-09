@@ -1,4 +1,4 @@
-# 📅 AI Calendar Planner
+`# 📅 AI Calendar Planner
 
 An AI-powered productivity application that turns natural-language requests into structured tasks and builds a schedule around priorities, deadlines, preferred working times, and existing Google Calendar events.
 
@@ -144,6 +144,7 @@ Sync scheduled blocks to Google Calendar
 GitHub: https://github.com/Sanika-Gajarishi
 
 ---
+
 
 ### 📄 License
 
