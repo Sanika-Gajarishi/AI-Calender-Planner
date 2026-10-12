@@ -9,7 +9,7 @@ from app.integrations.google_calendar import GoogleCalendarService
 from app.models.preference import UserPreference
 from app.models.task import Task
 from app.models.scheduled_block import ScheduledBlock
-
+from app.models.reschedule_proposal import RescheduleProposal
 from app.scheduler.multi_day_scheduler import (
     DailyAvailability,
     generate_multi_day_schedule,
@@ -87,6 +87,7 @@ class ScheduleService:
                 start=block.start_time,
                 end=block.end_time,
                 priority=block.task.priority,
+                block_id=block.id,
             )
             for block in blocks
         ]
@@ -373,10 +374,155 @@ class ScheduleService:
             "skipped": skipped_count,
         }
 
+    def create_reschedule_proposal(
+        self,
+        user_id: int,
+        task_id: int,
+        block_id: int,
+        new_start: datetime,
+        new_end: datetime,
+    ):
+        if new_end <= new_start:
+            raise ValueError(
+                "End time must be after start time."
+            )
+
+        block = (
+            self.db.query(ScheduledBlock)
+            .join(Task)
+            .filter(
+                ScheduledBlock.id == block_id,
+                ScheduledBlock.task_id == task_id,
+                Task.user_id == user_id,
+            )
+            .first()
+        )
+
+        if block is None:
+            raise ValueError(
+                "Scheduled block not found for this user."
+            )
+
+        proposal = RescheduleProposal(
+            user_id=user_id,
+            task_id=task_id,
+            block_id=block_id,
+            new_start=new_start,
+            new_end=new_end,
+            status="pending",
+        )
+
+        self.db.add(proposal)
+        self.db.commit()
+        self.db.refresh(proposal)
+
+        return {
+            "proposal_id": proposal.id,
+            "task_id": proposal.task_id,
+            "block_id": proposal.block_id,
+            "new_start": proposal.new_start.isoformat(),
+            "new_end": proposal.new_end.isoformat(),
+            "status": proposal.status,
+        }
+
+    def approve_reschedule_proposal(
+        self,
+        user_id: int,
+        proposal_id: int,
+    ):
+        proposal = (
+            self.db.query(RescheduleProposal)
+            .filter(
+                RescheduleProposal.id == proposal_id,
+                RescheduleProposal.user_id == user_id,
+            )
+            .with_for_update()
+            .first()
+        )
+
+        if proposal is None:
+            raise ValueError(
+                "Reschedule proposal not found."
+            )
+
+        if proposal.status != "pending":
+            raise ValueError(
+                "This proposal has already been processed."
+            )
+
+        # Validate that the original block still exists.
+        block = (
+            self.db.query(ScheduledBlock)
+            .join(Task)
+            .filter(
+                ScheduledBlock.id == proposal.block_id,
+                ScheduledBlock.task_id == proposal.task_id,
+                Task.user_id == user_id,
+            )
+            .first()
+        )
+
+        if block is None:
+            raise ValueError(
+                "The scheduled block no longer exists."
+            )
+
+        # Recheck conflicts and update the DB/Google event.
+        result = self.reschedule_task(
+            user_id=user_id,
+            task_id=proposal.task_id,
+            block_id=proposal.block_id,
+            new_start=proposal.new_start,
+            new_end=proposal.new_end,
+        )
+
+        proposal.status = "approved"
+        self.db.commit()
+
+        return {
+            "proposal_id": proposal.id,
+            "status": proposal.status,
+            **result,
+        }
+
+    def reject_reschedule_proposal(
+        self,
+        user_id: int,
+        proposal_id: int,
+    ):
+        proposal = (
+            self.db.query(RescheduleProposal)
+            .filter(
+                RescheduleProposal.id == proposal_id,
+                RescheduleProposal.user_id == user_id,
+            )
+            .with_for_update()
+            .first()
+        )
+
+        if proposal is None:
+            raise ValueError(
+                "Reschedule proposal not found."
+            )
+
+        if proposal.status != "pending":
+            raise ValueError(
+                "This proposal has already been processed."
+            )
+
+        proposal.status = "rejected"
+        self.db.commit()
+
+        return {
+            "proposal_id": proposal.id,
+            "status": proposal.status,
+        }
+
     def reschedule_task(
         self,
         user_id: int,
         task_id: int,
+        block_id: int,
         new_start: datetime,
         new_end: datetime,
     ):
@@ -400,16 +546,17 @@ class ScheduleService:
             self.db.query(ScheduledBlock)
             .join(Task)
             .filter(
+                ScheduledBlock.id == block_id,
                 ScheduledBlock.task_id == task_id,
                 Task.user_id == user_id,
             )
-            .order_by(ScheduledBlock.start_time)
+            
             .first()
         )
 
         if block is None:
             raise ValueError(
-                "No scheduled block found for this task."
+                "Scheduled block not found for this task and user."
             )
 
         
