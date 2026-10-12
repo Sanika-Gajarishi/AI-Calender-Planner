@@ -108,7 +108,13 @@ else:
         page = st.radio(
             "Navigation",
             PAGES,
-            key="page",
+            key="selector",
+            index=PAGES.index(st.session_state.page),
+            on_change =lambda: setattr(
+                st.session_state,
+                  "page", 
+                  st.session_state.selector,
+                  ),
         )
 
         if st.button("Logout", use_container_width=True):
