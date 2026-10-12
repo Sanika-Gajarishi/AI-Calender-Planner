@@ -12,6 +12,7 @@ from app.models import (
     Task,
     UserPreference,
     ScheduledBlock,
+    RescheduleProposal,
 )
 
 config = context.config
