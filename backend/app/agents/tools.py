@@ -9,7 +9,10 @@ def create_calendar_tools(
     get_calendar_events_fn: Callable,
     generate_schedule_fn: Callable,
     sync_schedule_fn: Callable,
-    reschedule_task_fn: Callable,
+    create_reschedule_proposal_fn: Callable,
+    approve_reschedule_proposal_fn: Callable,
+    reject_reschedule_proposal_fn: Callable,
+    get_scheduled_blocks_fn: Callable,
 
 ):
     """
@@ -49,6 +52,47 @@ def create_calendar_tools(
             )
 
         return "\n".join(lines)
+
+    @tool
+    def get_scheduled_blocks(
+        start_date: str,
+        number_of_days: int = 7,
+    ) -> str:
+        """
+        Retrieve the user's existing scheduled blocks.
+
+        Use this before proposing a task reschedule to discover
+        the correct task ID and block ID. This tool is read-only.
+
+        start_date must use YYYY-MM-DD format.
+        """
+        try:
+            blocks = get_scheduled_blocks_fn(
+                start_date=start_date,
+                number_of_days=number_of_days,
+            )
+
+            if not blocks:
+                return (
+                    "No scheduled blocks were found in this date range."
+                )
+
+            lines = ["Existing scheduled blocks:"]
+
+            for block in blocks:
+                lines.append(
+                    f"- Task ID: {block['task_id']} | "
+                    f"Block ID: {block['block_id']} | "
+                    f"Title: {block['title']} | "
+                    f"Start: {block['start']} | "
+                    f"End: {block['end']} | "
+                    f"Priority: {block['priority']}"
+                )
+
+            return "\n".join(lines)
+
+        except Exception as error:
+            return f"Unable to retrieve scheduled blocks: {error}"
 
     @tool
     def get_google_calendar_events(
@@ -375,37 +419,105 @@ def create_calendar_tools(
         return "\n".join(lines)
 
     @tool
-    def reschedule_task(
+    def propose_reschedule_task(
         task_id: int,
+        block_id: int,
         new_start: str,
         new_end: str,
     ) -> str:
         """
-        Reschedule an existing scheduled task.
+        Create a pending rescheduling proposal.
 
-        Use this only when the user explicitly asks
-        to move or reschedule a task.
+        Never move the task directly with this tool.
+        The user must approve the proposal separately.
 
-        new_start and new_end must be ISO-8601
-        datetime strings.
+        Supply the exact task_id and scheduled block_id.
+        Datetimes must use ISO-8601 format.
         """
 
         try:
-            result = reschedule_task_fn(
-                task_id,
-                new_start,
-                new_end,
+            result = create_reschedule_proposal_fn(
+                task_id=task_id,
+                block_id=block_id,
+                new_start=new_start,
+                new_end=new_end,
             )
 
             return (
-                f"Task '{result['title']}' was rescheduled "
-                f"from its previous time to "
-                f"{result['start']} -> {result['end']}."
+                "Rescheduling proposal created. "
+                f"Proposal ID: {result['proposal_id']}. "
+                f"Task ID: {result['task_id']}. "
+                f"Block ID: {result['block_id']}. "
+                f"Proposed time: {result['new_start']} "
+                f"to {result['new_end']}. "
+                "Status: pending approval. "
+                "The schedule has NOT been changed. "
+                "Ask the user to approve or reject this proposal."
             )
 
         except Exception as error:
             return (
-                f"Unable to reschedule the task: {error}"
+                f"Unable to create rescheduling proposal: {error}"
+            )
+
+    @tool
+    def approve_reschedule_proposal(proposal_id: int) -> str:
+        """
+        Approve a specific pending rescheduling proposal.
+
+        Use only when the user explicitly asks to approve
+        the specified proposal ID. Never approve automatically
+        after creating a proposal.
+        """
+        try:
+            result = approve_reschedule_proposal_fn(
+                proposal_id=proposal_id
+            )
+
+            if isinstance(result, dict):
+                status = result.get("status", "approved")
+            else:
+                status = getattr(result, "status", "approved")
+
+            return (
+                f"Rescheduling proposal {proposal_id} "
+                f"processed successfully. Status: {status}. "
+                "Verify the updated schedule before claiming "
+                "that Google Calendar was updated."
+            )
+        except Exception as error:
+            return (
+                f"Unable to approve proposal {proposal_id}: "
+                f"{error}"
+            )
+
+    @tool
+    def reject_reschedule_proposal(proposal_id: int) -> str:
+        """
+        Reject a specific pending rescheduling proposal.
+
+        Use only when the user explicitly asks to reject
+        the specified proposal ID.
+        """
+        try:
+            result = reject_reschedule_proposal_fn(
+                proposal_id=proposal_id
+            )
+
+            if isinstance(result, dict):
+                status = result.get("status", "rejected")
+            else:
+                status = getattr(result, "status", "rejected")
+
+            return (
+                f"Rescheduling proposal {proposal_id} "
+                f"processed successfully. Status: {status}. "
+                "The proposed change should not be applied."
+            )
+        except Exception as error:
+            return (
+                f"Unable to reject proposal {proposal_id}: "
+                f"{error}"
             )
 
     @tool
@@ -469,10 +581,13 @@ def create_calendar_tools(
 
     return [
         get_pending_tasks,
+        get_scheduled_blocks,
         get_google_calendar_events,
         check_schedule_conflict,
         find_available_time_slots,
-        reschedule_task,
+        propose_reschedule_task,
+        approve_reschedule_proposal,
+        reject_reschedule_proposal,
         generate_smart_schedule,
         sync_schedule_to_google_calendar,
     ]
