@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 class ScheduleItemResponse(BaseModel):
     task_id: int
+    block_id: int | None = None
     title: str
     start: datetime
     end: datetime
