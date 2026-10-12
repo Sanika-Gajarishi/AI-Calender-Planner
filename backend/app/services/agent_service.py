@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.agents.calendar_agent import CalendarAgent
 from app.agents.tools import create_calendar_tools
-
+from app.models.scheduled_block import ScheduledBlock
 from app.models.task import Task
 from app.services.schedule_service import ScheduleService
 
@@ -51,6 +51,54 @@ class AgentService:
                 "preferred_time": task.preferred_time,
             }
             for task in tasks
+        ]
+
+    def get_scheduled_blocks(
+        self,
+        start_date: str,
+        number_of_days: int = 7,
+    ):
+        if number_of_days < 1 or number_of_days > 90:
+            raise ValueError("number_of_days must be between 1 and 90.")
+
+        start = date.fromisoformat(start_date)
+        end = start + timedelta(days=number_of_days)
+
+        tz = ZoneInfo(self._user_timezone)
+        range_start = datetime.combine(
+            start,
+            datetime.min.time(),
+            tzinfo=tz,
+        )
+        range_end = datetime.combine(
+            end,
+            datetime.min.time(),
+            tzinfo=tz,
+        )
+
+        blocks = (
+            self.db.query(ScheduledBlock)
+            .join(Task)
+            .filter(
+                Task.user_id == self.user_id,
+                Task.status == "pending",
+                ScheduledBlock.start_time < range_end,
+                ScheduledBlock.end_time > range_start,
+            )
+            .order_by(ScheduledBlock.start_time)
+            .all()
+        )
+
+        return [
+            {
+                "task_id": block.task_id,
+                "block_id": block.id,
+                "title": block.task.title,
+                "start": block.start_time.isoformat(),
+                "end": block.end_time.isoformat(),
+                "priority": block.task.priority,
+            }
+            for block in blocks
         ]
 
     def get_calendar_events(
@@ -152,9 +200,10 @@ class AgentService:
             for task in tasks
         ]
 
-    def reschedule_task(
+    def create_reschedule_proposal(
         self,
         task_id: int,
+        block_id: int,
         new_start: str,
         new_end: str,
     ):
@@ -168,11 +217,32 @@ class AgentService:
             new_end.replace("Z", "+00:00")
         )
 
-        return service.reschedule_task(
+        return service.create_reschedule_proposal(
             user_id=self.user_id,
             task_id=task_id,
+            block_id=block_id,
             new_start=start,
             new_end=end,
+        )
+
+    def approve_reschedule_proposal(
+        self,
+        proposal_id: int,
+    ):
+        service = ScheduleService(self.db)
+        return service.approve_reschedule_proposal(
+            user_id=self.user_id,
+            proposal_id=proposal_id,
+        )
+
+    def reject_reschedule_proposal(
+        self,
+        proposal_id: int,
+    ):
+        service = ScheduleService(self.db)
+        return service.reject_reschedule_proposal(
+            user_id=self.user_id,
+            proposal_id=proposal_id,
         )
 
     def _extract_conflict_request(self, message: str):
@@ -289,7 +359,14 @@ class AgentService:
             get_calendar_events_fn=self.get_calendar_events,
             generate_schedule_fn=self.generate_schedule,
             sync_schedule_fn=self.sync_schedule,
-            reschedule_task_fn=self.reschedule_task,
+            create_reschedule_proposal_fn=self.create_reschedule_proposal,
+            approve_reschedule_proposal_fn=(
+                self.approve_reschedule_proposal
+            ),
+            reject_reschedule_proposal_fn=(
+                self.reject_reschedule_proposal
+            ),
+            get_scheduled_blocks_fn=self.get_scheduled_blocks,
         )
 
 
