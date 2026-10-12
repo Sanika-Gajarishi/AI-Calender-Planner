@@ -21,6 +21,7 @@ class ScheduledTask:
     start: datetime
     end: datetime
     priority: str
+    block_id: int | None = None
     block_number: int = 1
 
     @property
