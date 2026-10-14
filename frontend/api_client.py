@@ -186,6 +186,30 @@ class APIClient:
             },
             timeout=120,
         )
+        response.raise_for_status()
+        return response.json()
+
+    def get_schedule(self, start_date, number_of_days=7):
+        response = requests.get(
+            f"{API_BASE_URL}/schedule",
+            headers=self._headers(),
+            params={
+                "start_date": start_date,
+                "number_of_days": number_of_days,
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        return response.json()
+        return response.json()
+
+    def approve_reschedule_proposal(self, proposal_id):
+        response = requests.post(
+            f"{API_BASE_URL}/agent/reschedule-proposals/approve",
+            headers=self._headers(),
+            json={"proposal_id": proposal_id},
+            timeout=30,
+        )
 
         response.raise_for_status()
         return response.json()
