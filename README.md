@@ -5,7 +5,6 @@ An AI-powered task and calendar planning application that turns natural-language
 > **Project status:** This README describes the code and integrations currently present in the repository. Google OAuth credentials, a Gemini API key, PostgreSQL, and a correctly configured local environment are required for the corresponding features. 
 
 
----
 
 ## Table of Contents
 
@@ -30,7 +29,7 @@ An AI-powered task and calendar planning application that turns natural-language
 - [Possible Future Improvements](#possible-future-improvements)
 - [Author](#author)
 
-  ---
+
 
 ## Overview
 
@@ -43,7 +42,7 @@ The application is divided into two main components:
 1. **Backend (`backend/`)** — a FastAPI service containing the API routes, business services, AI integrations, scheduling logic, authentication, database models, and Google Calendar integration.
 2. **Frontend (`frontend/`)** — a Streamlit interface for registration and login, viewing and maintaining tasks, creating tasks with AI, generating schedules, and interacting with the calendar agent.
 
----
+
 
 ## The Problem It Solves
 
@@ -53,16 +52,13 @@ Instead of needing to manually convert every task description into several field
 
 The objective is to support planning decisions—not to assume the AI is always correct. Users should review AI-created task details and generated schedules before relying on them.
 
----
 
 ## Key Features
 
----
+
 ### 1. Account registration and login
 
 The backend exposes registration and login endpoints. Login returns an access token, and the Streamlit client sends that token as a Bearer token when calling protected endpoints. Task queries are scoped to the authenticated user in the task routes.
-
----
 
 ### 2. Natural-language task creation
 
@@ -77,7 +73,6 @@ The **Create Task with AI** flow accepts a plain-language description. The backe
 
 The backend then saves the task so it can be viewed and scheduled like a manually created task. AI extraction depends on the clarity of the input and the availability of the configured Gemini service; verify the result after creation.
 
----
 
 ### 3. Task management
 
@@ -85,7 +80,6 @@ The task API supports creating, listing, retrieving, updating, and deleting task
 
 When deleting a task, the current backend also attempts to delete associated Google Calendar events for scheduled blocks that have a stored Google event ID. If an event was already removed or Google Calendar returns an error, the backend logs the issue and continues the task deletion.
 
----
 
 ### 4. Smart multi-day scheduling
 
@@ -103,13 +97,10 @@ The scheduling workflow is designed to consider information such as:
 
 The generated schedule is saved as scheduled blocks and can be retrieved for later viewing. The exact result depends on task data, preferences, calendar availability, and the scheduler's allocation rules.
 
----
 
 ### 5. Calendar preferences
 
 Preference models and schemas represent schedule settings including work start/end times, preferred work period, maximum daily hours, break duration, preferred task length, and time zone. These preferences give the scheduler constraints and defaults to use while producing a plan.
-
----
 
 ### 6. Google Calendar connection and event retrieval
 
@@ -117,13 +108,9 @@ The backend includes Google OAuth authorization and a Google Calendar service in
 
 This integration requires the user to configure a Google Cloud project and grant the requested Calendar scope. Google Calendar support will not work until the OAuth setup is complete.
 
----
-
 ### 7. Schedule synchronization
 
 The client includes an action to synchronize a generated schedule with Google Calendar. Scheduled blocks can retain Google Calendar event IDs so later operations can reference the corresponding remote event. A successful API request should be checked for its response and the resulting events in Google Calendar; availability of this feature depends on valid OAuth credentials and Calendar API access.
-
----
 
 ### 8. AI Calendar Agent
 
@@ -131,13 +118,9 @@ The **AI Calendar Agent** combines a Gemini-backed chat model with application t
 
 The codebase includes tools and service logic for operations such as getting pending tasks, inspecting scheduled blocks, checking availability/conflicts, generating or syncing a schedule, and proposing a reschedule. The rescheduling API includes proposal creation, approval, and rejection endpoints. A proposal is a pending change until it is explicitly approved; the agent should not describe a task as moved merely because a proposal exists.
 
----
-
 ### 9. Rescheduling proposals
 
 The backend exposes endpoints to create a rescheduling proposal and to approve or reject it. Proposal validation handles cases such as missing records and scheduling conflicts. This approval step is intended to keep the user in control of changes to a plan.
-
----
 
 ### 10. Dashboard and calendar-oriented UI
 
@@ -148,8 +131,6 @@ The Streamlit frontend provides these views:
 - **My Tasks** — review and manage tasks.
 - **Smart Schedule** — generate and view planned time blocks.
 - **AI Calendar Agent** — chat with the AI assistant about supported task and calendar workflows.
-
----
 
 ## How It Works
 
@@ -164,7 +145,6 @@ A typical workflow looks like this:
 7. **Use the AI agent.** Ask questions about tasks or calendar availability, or request supported actions. For rescheduling, review the proposal before approving it.
 8. **Synchronize and revisit.** Where configured, synchronize generated schedule blocks with Google Calendar and return to the application as task status changes.
 
----
 
 ### High-level architecture
 
@@ -191,7 +171,6 @@ A typical workflow looks like this:
 │ Schedule Blocks│ └───────────────────┘ └───────────────────┘
 └────────────────┘
 ```
----
 
 ## Technology Stack
 
@@ -211,7 +190,6 @@ A typical workflow looks like this:
 
 Exact dependency versions are listed in `backend/requirements.txt`. The frontend currently has a `frontend/requirements.txt` file, but it contains the same broad dependency list as the backend rather than a minimal UI-only set.
 
----
 
 ## Architecture
 
@@ -219,37 +197,30 @@ Exact dependency versions are listed in `backend/requirements.txt`. The frontend
 
 `frontend/app.py` configures the Streamlit page, manages login state and navigation, and dispatches to UI components. The `APIClient` class centralizes HTTP calls so UI components do not need to construct every endpoint request themselves. It adds the access token to protected requests using the `Authorization: Bearer ...` header.
 
----
 
 ### API layer
 
 The routers under `backend/app/api/` expose routes for users, authentication, tasks, AI task creation, preferences, schedule generation/retrieval, calendar connection/event retrieval, and agent/rescheduling actions. The API layer validates input, gets a database session where necessary, checks the current user on protected routes, invokes a service, and converts expected failures into HTTP errors.
 
----
-
 ### Service layer
 
 The services under `backend/app/services/` separate business operations from HTTP routes. Examples include task creation, authentication, Gemini interaction, schedule generation, calendar availability, schedule persistence, and agent orchestration. This makes it easier to test business logic and update integrations without moving all logic into route handlers.
 
----
 
 ### Scheduling engine
 
 The `backend/app/scheduler/` package separates scheduling concerns into specialized modules. The multi-day scheduling path uses task and availability representations and allocation helpers rather than relying on the language model alone to place every task. This is important because schedule placement must respect time ranges and avoid overlapping allocations. 
 
----
 
 ### Persistence and migrations
 
 SQLAlchemy models represent application data, and Alembic holds versioned migrations under `backend/alembic/versions/`. The database URL is supplied through `DATABASE_URL`. Ensure the target database exists and migrations match the model version before launching the app.
 
----
 
 ### AI and external integrations
 
 `GeminiService` calls Google's GenAI SDK using the configured `GEMINI_API_KEY`. The calendar agent uses a Gemini-backed LangChain chat model and registered tools. Google Calendar authorization uses a local OAuth client-secret file and stores the resulting user token in `backend/token.json` (the token is sensitive and must not be committed).
 
----
 
 ## Repository Structure
 
@@ -289,7 +260,6 @@ AI-Calender-Planner/
 ├── .gitignore
 └── README.md
 ```
----
 
 ## Prerequisites
 
@@ -303,7 +273,6 @@ Install or prepare the following before running the project:
 
 Because dependencies are pinned and include recent package versions, if `pip install` fails on your Python version, verify compatibility for the specific failing package rather than upgrading every package indiscriminately.
 
----
 
 ## Installation and Setup
 
@@ -313,7 +282,7 @@ Because dependencies are pinned and include recent package versions, if `pip ins
 git clone https://github.com/Sanika-Gajarishi/AI-Calender-Planner.git
 cd AI-Calender-Planner
 ```
----
+
 ### 2. Create the PostgreSQL database
 
 Open PostgreSQL using `psql`, pgAdmin, or another PostgreSQL client and create a database. For example:
@@ -324,7 +293,7 @@ CREATE DATABASE ai_calendar_planner;
 
 Use the exact database name you place in `DATABASE_URL` below. This command creates the database only; it does not configure the database user or password.
 
----
+
 
 ### 3. Configure the backend environment
 
@@ -342,7 +311,7 @@ pip install -r requirements.txt
 
 If PowerShell blocks environment activation, you may use the Command Prompt activation script (`.venv\Scripts\activate.bat`) or adjust your local execution policy according to your organization's guidance.
 
----
+
 
 **macOS / Linux**
 
@@ -363,7 +332,6 @@ GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 
 Replace `YOUR_PASSWORD` and `YOUR_GEMINI_API_KEY` with your own values. If your PostgreSQL installation uses a different host, port, username, or database name, update the URL accordingly. Do not wrap values in angle brackets and do not commit the `.env` file.
 
----
 
 ### 4. Initialize the database schema
 
@@ -377,13 +345,11 @@ If the database is newly created, this applies the repository's migrations to th
 
 The current FastAPI startup code also calls `Base.metadata.create_all()` and includes a few conditional column checks. Migrations should still be treated as the primary versioned schema-management mechanism; avoid casually mixing manual schema edits with Alembic history.
 
----
 
 ### 5. Configure Google Calendar (optional but needed for calendar features)
 
 If you want to use Google Calendar integration, follow the [Google Calendar Configuration](#google-calendar-configuration) section before testing connection or scheduling features that require real calendar availability.
 
----
 
 ### 6. Start the backend
 
@@ -400,7 +366,6 @@ The local API base URL is `http://127.0.0.1:8000`. The backend defines a root ro
 
 Keep this terminal running while using the frontend.
 
----
 
 ### 7. Start the Streamlit frontend
 
@@ -413,7 +378,6 @@ cd frontend
 ..\backend\.venv\Scripts\Activate.ps1
 streamlit run app.py
 ```
----
 
 **macOS / Linux**
 
@@ -427,7 +391,7 @@ The frontend configuration in `frontend/config.py` currently sets the API URL to
 
 Streamlit normally prints a local address (often `http://localhost:8501`) in the terminal and opens it in your browser. Register an account or log in to begin.
 
----
+
 
 ## Environment Variables
 
@@ -441,7 +405,6 @@ Streamlit normally prints a local address (often `http://localhost:8501`) in the
 
 The backend settings load environment values from `.env` relative to the process's working directory. Start the backend from `backend/` so `backend/.env` is discovered as expected.
 
----
 
 ## Google Calendar Configuration
 
@@ -466,8 +429,6 @@ Google Calendar integration uses OAuth credentials, not merely a generic Calenda
 
 The code requests the Calendar scope `https://www.googleapis.com/auth/calendar`. Review the scope and Google's consent requirements for your account type. Do not upload OAuth client secrets or token files to GitHub, screenshots, or public issue threads.
 
----
-
 ## Database Setup and Migrations
 
 The application uses SQLAlchemy models and a PostgreSQL URL supplied via `DATABASE_URL`. Migration files live in `backend/alembic/versions/`.
@@ -486,8 +447,6 @@ alembic history
 ```
 
 Before creating a new migration, make and review the model change, then use Alembic's migration-generation workflow and inspect the generated script manually. The database should be backed up before applying schema changes to important data.
-
----
 
 ## Running the Application
 
@@ -510,8 +469,6 @@ streamlit run app.py
 ```
 
 Then open the Streamlit URL shown in the terminal. If the interface loads but requests fail, confirm that FastAPI is reachable at the configured `API_BASE_URL` and that the backend terminal does not show configuration or database errors.
-
----
 
 ## Using the Application
 
@@ -548,8 +505,6 @@ These are examples, not guaranteed interpretations. Check the generated title, d
 - `Approve rescheduling proposal 3.`
 
 The results depend on your saved data, access token, connected Google Calendar, and the tools currently available to the agent. When the agent offers a rescheduling proposal, inspect the proposal and approve or reject its ID explicitly. 
-
----
 
 ## API Overview
 
@@ -594,7 +549,6 @@ curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
 
 Replace `YOUR_ACCESS_TOKEN` with a real token. Never share a valid token publicly. 
 
----
 
 ## Testing
 
@@ -616,8 +570,6 @@ pytest tests/test_ai_task.py -v
 
 Some tests may need environment configuration, valid external credentials, network access, and a working PostgreSQL database. A test that calls Gemini or Google Calendar can fail because of credentials, quotas, OAuth state, or network issues even when the local scheduling logic is functioning. Prefer isolated unit tests for core scheduling rules and clearly separate them from live-integration tests. 
 
----
-
 ## Security Notes
 
 - **Never commit secrets.** Keep `backend/.env`, OAuth client secrets, token files, database passwords, and real access tokens out of Git.
@@ -628,7 +580,6 @@ Some tests may need environment configuration, valid external credentials, netwo
 - Check all AI-generated fields before scheduling. A language model can misinterpret ambiguous dates, durations, priorities, and time zones.
 - Review calendar sync and rescheduling changes before applying them to a real calendar.
 
----
 
 ## Troubleshooting
 
@@ -679,7 +630,6 @@ Potential next steps for the project include:
 
 These are suggestions for future work, not claims that those changes are already implemented. 
 
----
 
 ## Author
 
@@ -688,6 +638,6 @@ These are suggestions for future work, not claims that those changes are already
 - GitHub: [Sanika-Gajarishi](https://github.com/Sanika-Gajarishi)
 - Project repository: [AI-Calender-Planner](https://github.com/Sanika-Gajarishi/AI-Calender-Planner)
 
----
+
 
 If you find an issue or want to suggest an improvement, open an issue in the repository with reproducible steps and remove all passwords, tokens, and private calendar information before sharing logs.
