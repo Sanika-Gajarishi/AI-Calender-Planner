@@ -615,30 +615,12 @@ Schedule generation requires a preference record for the user. Add preferences t
 
 Make sure you are in `backend/`, your virtual environment is active, `DATABASE_URL` points to the right database, and the PostgreSQL database already exists. Review `alembic current` and `alembic history` before attempting to stamp or manually change the revision; do not use `stamp head` as a generic fix for migration errors.
 
-## Possible Future Improvements
-
-Potential next steps for the project include:
-
-- Make preference endpoints consistently use the authenticated user instead of a hard-coded ID.
-- Separate frontend and backend dependency files so each environment installs only the packages it needs.
-- Add a documented, validated configuration system for the frontend API URL.
-- Add automated tests for authentication, multi-user data isolation, schedule conflicts, and proposal approval/rejection.
-- Distinguish unit tests from tests requiring live Gemini or Google Calendar credentials.
-- Improve structured logging and return consistent error messages for external integration failures.
-- Add deployment instructions and production configuration after a deployable environment is selected.
-- Add screenshots or a short demo GIF to illustrate the dashboard, AI task creation, schedule view, and agent chat.
-
-These are suggestions for future work, not claims that those changes are already implemented. 
-
-
 ## Author
 
 **Sanika Gajarishi**
 
 - GitHub: [Sanika-Gajarishi](https://github.com/Sanika-Gajarishi)
 - Project repository: [AI-Calender-Planner](https://github.com/Sanika-Gajarishi/AI-Calender-Planner)
-
-If you find an issue or want to suggest an improvement, open an issue in the repository with reproducible steps and remove all passwords, tokens, and private calendar information before sharing logs.
 
 ## License
 
