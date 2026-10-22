@@ -638,8 +638,9 @@ These are suggestions for future work, not claims that those changes are already
 - GitHub: [Sanika-Gajarishi](https://github.com/Sanika-Gajarishi)
 - Project repository: [AI-Calender-Planner](https://github.com/Sanika-Gajarishi/AI-Calender-Planner)
 
+If you find an issue or want to suggest an improvement, open an issue in the repository with reproducible steps and remove all passwords, tokens, and private calendar information before sharing logs.
+
 ## License
 
 This project is intended for educational and demonstration purposes.
 
-If you find an issue or want to suggest an improvement, open an issue in the repository with reproducible steps and remove all passwords, tokens, and private calendar information before sharing logs.
